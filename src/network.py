@@ -53,11 +53,11 @@ class Network(object):
         tracking progress, but slows things down substantially."""
         if test_data: n_test = len(test_data)
         n = len(training_data)
-        for j in xrange(epochs):
+        for j in range(epochs):
             random.shuffle(training_data)
             mini_batches = [
                 training_data[k:k+mini_batch_size]
-                for k in xrange(0, n, mini_batch_size)]
+                for k in range(0, n, mini_batch_size)]
             for mini_batch in mini_batches:
                 self.update_mini_batch(mini_batch, eta)
             if test_data:
@@ -73,33 +73,50 @@ class Network(object):
         is the learning rate."""
         x = [t[0] for t in mini_batch]
         y = [t[1] for t in mini_batch]
-        nabla_w, nabla_b = self.backprop(x, y) 
-        self.weights = [w-(eta/len(mini_batch))*nw
-                        for w, nw in zip(self.weights, nabla_w)]
-        self.biases = [b-(eta/len(mini_batch))*nb
-                       for b, nb in zip(self.biases, nabla_b)]
+        nabla_b, nabla_w = self.backprop(x, y)
+        for i, (w, nw) in enumerate(zip(self.weights, nabla_w)):
+            if np.shape(w) != np.shape(nw):
+                raise ValueError(f"Shape mismatch: {i} {w}, {nw}")
+            self.weights[i] = w-(eta/len(mini_batch))*nw
+        for i, (b, nb) in enumerate(zip(self.biases, nabla_b)):
+            if np.shape(b) != np.shape(nb):
+                raise ValueError(f"Shape mismatch: {i} {b}, {nb}")
+            self.biases[i] = b-(eta/len(mini_batch))*nb
+            
+        # breakpoint()
+        # self.weights = [w-(eta/len(mini_batch))*nw
+        #                 for w, nw in zip(self.weights, nabla_w)]
+        # self.biases = [b-(eta/len(mini_batch))*nb
+        #                for b, nb in zip(self.biases, nabla_b)]
 
     def backprop(self, x, y):
         """Return a tuple ``(nabla_b, nabla_w)`` representing the
         gradient for the cost function C_x.  ``nabla_b`` and
         ``nabla_w`` are layer-by-layer lists of numpy arrays, similar
         to ``self.biases`` and ``self.weights``."""
-        nabla_b = [np.zeros(list(b.shape) + [np.shape(x)[0]]) for b in self.biases]
-        nabla_w = [np.zeros(list(w.shape) + [np.shape(x)[0]]) for w in self.weights]
+        x = np.transpose(np.squeeze(x, axis=-1))
+        y = np.transpose(np.squeeze(y, axis=-1))
+        nabla_b = [np.zeros(list(b.shape)) for b in self.biases]
+        nabla_w = [np.zeros(list(w.shape)) for w in self.weights]
         # feedforward
-        x = np.transpose(x)
         activation = x
         activations = [x] # list to store all the activations, layer by layer
         zs = [] # list to store all the z vectors, layer by layer
+        # breakpoint()
         for b, w in zip(self.biases, self.weights):
-            z = np.matmul(w, activation)+np.tile(b, (1,np.shape(x)[1]))
+            try:
+                z = np.matmul(w, activation)+np.tile(b, (1,np.shape(x)[1]))
+            except ValueError as e:
+                breakpoint()
             zs.append(z)
             activation = sigmoid(z)
             activations.append(activation)
+        # breakpoint()
         # backward pass
         delta = self.cost_derivative(activations[-1], y) * \
             sigmoid_prime(zs[-1])
         nabla_b[-1] = np.sum(delta, -1)
+        nabla_b[-1] = np.reshape(nabla_b[-1], np.shape(nabla_b[-1]) + (1,))
         nabla_w[-1] = np.matmul(delta, activations[-2].transpose())
         # Note that the variable l in the loop below is used a little
         # differently to the notation in Chapter 2 of the book.  Here,
@@ -112,6 +129,7 @@ class Network(object):
             sp = sigmoid_prime(z)
             delta = np.matmul(self.weights[-l+1].transpose(), delta) * sp
             nabla_b[-l] = np.sum(delta, -1)
+            nabla_b[-l] = np.reshape(nabla_b[-l], np.shape(nabla_b[-l]) + (1,))
             nabla_w[-l] = np.matmul(delta, activations[-l-1].transpose())
         return nabla_b, nabla_w
 
