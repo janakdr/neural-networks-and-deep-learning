@@ -76,10 +76,12 @@ class Network(object):
         nabla_b, nabla_w = self.backprop(x, y)
         for i, (w, nw) in enumerate(zip(self.weights, nabla_w)):
             if np.shape(w) != np.shape(nw):
+                breakpoint()
                 raise ValueError(f"Shape mismatch: {i} {w}, {nw}")
             self.weights[i] = w-(eta/len(mini_batch))*nw
         for i, (b, nb) in enumerate(zip(self.biases, nabla_b)):
             if np.shape(b) != np.shape(nb):
+                breakpoint()
                 raise ValueError(f"Shape mismatch: {i} {b}, {nb}")
             self.biases[i] = b-(eta/len(mini_batch))*nb
             
@@ -94,8 +96,8 @@ class Network(object):
         gradient for the cost function C_x.  ``nabla_b`` and
         ``nabla_w`` are layer-by-layer lists of numpy arrays, similar
         to ``self.biases`` and ``self.weights``."""
-        x = np.transpose(np.squeeze(x, axis=-1))
-        y = np.transpose(np.squeeze(y, axis=-1))
+        # x = np.transpose(np.squeeze(x, axis=-1))
+        # y = np.transpose(np.squeeze(y, axis=-1))
         nabla_b = [np.zeros(list(b.shape)) for b in self.biases]
         nabla_w = [np.zeros(list(w.shape)) for w in self.weights]
         # feedforward
@@ -105,7 +107,7 @@ class Network(object):
         # breakpoint()
         for b, w in zip(self.biases, self.weights):
             try:
-                z = np.matmul(w, activation)+np.tile(b, (1,np.shape(x)[1]))
+                z = w@activation+b
             except ValueError as e:
                 breakpoint()
             zs.append(z)
@@ -115,9 +117,9 @@ class Network(object):
         # backward pass
         delta = self.cost_derivative(activations[-1], y) * \
             sigmoid_prime(zs[-1])
-        nabla_b[-1] = np.sum(delta, -1)
-        nabla_b[-1] = np.reshape(nabla_b[-1], np.shape(nabla_b[-1]) + (1,))
-        nabla_w[-1] = np.matmul(delta, activations[-2].transpose())
+        nabla_b[-1] = np.sum(delta, 0)
+        # nabla_b[-1] = np.reshape(nabla_b[-1], np.shape(nabla_b[-1]) + (1,))
+        nabla_w[-1] = np.sum(delta @ np.transpose(activations[-2], (0, 2, 1)), 0)
         # Note that the variable l in the loop below is used a little
         # differently to the notation in Chapter 2 of the book.  Here,
         # l = 1 means the last layer of neurons, l = 2 is the
@@ -127,10 +129,10 @@ class Network(object):
         for l in range(2, self.num_layers):
             z = zs[-l]
             sp = sigmoid_prime(z)
-            delta = np.matmul(self.weights[-l+1].transpose(), delta) * sp
-            nabla_b[-l] = np.sum(delta, -1)
-            nabla_b[-l] = np.reshape(nabla_b[-l], np.shape(nabla_b[-l]) + (1,))
-            nabla_w[-l] = np.matmul(delta, activations[-l-1].transpose())
+            delta = (self.weights[-l+1].transpose() @ delta) * sp
+            nabla_b[-l] = np.sum(delta, 0)
+            # nabla_b[-l] = np.reshape(nabla_b[-l], np.shape(nabla_b[-l]) + (1,))
+            nabla_w[-l] = np.sum(delta @ np.transpose(activations[-l-1], (0, 2, 1)), 0)
         return nabla_b, nabla_w
 
 # reload(network)
@@ -159,3 +161,9 @@ def sigmoid(z):
 def sigmoid_prime(z):
     """Derivative of the sigmoid function."""
     return sigmoid(z)*(1-sigmoid(z))
+
+
+def setup():
+    reload(network)
+    net = network.Network([784, 30, 10])
+    net.SGD(training_data, 30, 8, 3.0, test_data=test_data)
